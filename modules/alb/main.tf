@@ -1,17 +1,21 @@
 module "alb" {
-  source = "git@github.com:terraform-aws-modules/terraform-aws-alb.git?ref=v6.0.0"
+  # Correct source URL from the GitHub repository
+ source  = "git::https://github.com/terraform-aws-modules/terraform-aws-alb.git?ref=v6.0.0"
+  version = "v8.0.0"  # Latest version tag or update according to your need
 
-  name = "demo-alb"
+  name = "group-alb"
 
+  # The type of Load Balancer
   load_balancer_type = "application"
 
+  # Reference VPC and subnet
   vpc_id          = var.vpc_alb
   subnets         = var.subnet_alb
   security_groups = [var.sec_group_alb]
 
+  # Target Group Configuration
   target_groups = [
     {
-      name             = "target-group"
       backend_protocol = "HTTP"
       backend_port     = 80
       target_type      = "instance"
@@ -29,6 +33,7 @@ module "alb" {
     }
   ]
 
+  # HTTP Listener Configuration
   http_tcp_listeners = [
     {
       port               = 80
@@ -38,19 +43,18 @@ module "alb" {
     }
   ]
 
+  # Adding Tags for the Load Balancer
   tags = {
     Project = "terraform_drupal"
-    Name    = "terraform_asg_cluster"
-    BU      = "demo-testing"
-    Owner   = "pratishtha.verma@tothenew.com"
-    Purpose = "gtihub project"
   }
 }
 
+# Output for Target Group ARN
 output "tg" {
   value = module.alb.target_group_arns
 }
 
-output "alb_dns" {
+# Output for DNS Name of the ALB
+output "dns" {
   value = module.alb.lb_dns_name
 }

@@ -1,0 +1,19 @@
+rds_engine               = "mysql"
+rds_engine_version       = "8.0.23"
+rds_instance_class       = "db.m5.large"
+rds_allocated_storage    = 100
+rds_max_allocated_storage = 200
+rds_name                 = "mydb_instance"
+rds_username             = "adminuser"
+rds_password             = "your_secure_password" # Use a secure password here
+rds_port                 = 3306
+rds_parameter_group_name = "default.mysql8.0"
+rds_create_db_parameter_group = false
+rds_create_db_option_group    = false
+rds_maintenance_window  = "Mon:00:00-Mon:01:00"
+rds_backup_window       = "03:00-03:30"
+rds_backup_retention_period = 7
+rds_skip_final_snapshot = true
+
+subnet_rds = ["subnet-0bb1c79de3EXAMPLE", "subnet-1a2b3c4d5eEXAMPLE"]
+sec_group_rds = ["sg-0123456789abcdef0"]

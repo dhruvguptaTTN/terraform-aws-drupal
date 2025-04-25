@@ -1,12 +1,79 @@
 locals {
-  name = "demo-asg"
+  name = "group-asg"
 }
 
+# generate key-pair for launch template
+resource "tls_private_key" "dev_key" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "aws_key_pair" "generated_key" {
+  key_name   = "instance-key"
+  public_key = tls_private_key.dev_key.public_key_openssh
+
+  provisioner "local-exec" {    
+    command = "echo '${tls_private_key.dev_key.private_key_pem}' > ./instance-key.pem"
+  }
+
+  provisioner "local-exec" {
+    command = "chmod 400 ./instance-key.pem"
+  }
+}
+
+resource "aws_iam_role" "drupal_access_role" {
+  name               = "drupal_access_role"
+  assume_role_policy = file("./modules/asg/policies/assume_role_policy.json")
+}
+
+resource "aws_iam_instance_profile" "drupal-grp_profile" {
+  name = "drupal-grp_profile"
+  role = aws_iam_role.drupal_access_role.name
+}
+
+# resource "aws_iam_policy" "cloudwatchagentserver-policy" {
+#   name        = "cloudwatchagentserver-policy"
+#   description = "cloudwatch agent server policy"
+#   policy      = file("./modules/asg/policies/CloudwatchAgentServerPolicy.json")
+# }
+
+# resource "aws_iam_policy_attachment" "cloudwatchagentserver-attach" {
+#   name       = "cloudwatchagentserver-attachment"
+#   roles      = [aws_iam_role.drupal_access_role.name]
+#   policy_arn = aws_iam_policy.cloudwatchagentserver-policy.arn
+# }
+
+data "aws_iam_policy" "CloudWatchAgentPolicy" {
+  arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+resource "aws_iam_policy_attachment" "cloudwatch-agent-server-policy-attach" {
+  name =  "cloudwatch-agent-server-policy-attach"
+  roles       = [aws_iam_role.drupal_access_role.name]
+  policy_arn = data.aws_iam_policy.CloudWatchAgentPolicy.arn
+}
+
+resource "aws_iam_policy" "cw-s3-policy" {
+  name        = "cw-s3-policy"
+  description = "cloudwatch agent s3 server policy"
+  policy      = file("./modules/asg/policies/s3-policy.json")
+}
+
+resource "aws_iam_policy_attachment" "cw-s3-attach" {
+  name       = "cw-s3-attachment"
+  roles      = [aws_iam_role.drupal_access_role.name]
+  policy_arn = aws_iam_policy.cw-s3-policy.arn
+}
+
+
 module "aws_autoscaling_group" {
-  source = "git@github.com:terraform-aws-modules/terraform-aws-autoscaling.git?ref=v4.1.0"
+  #source = "git@github.com:terraform-aws-modules/terraform-aws-autoscaling.git?ref=v4.1.0"
+
+  source  = "terraform-aws-modules/autoscaling/aws"
+  version = "4.1.0"
 
   # Autoscaling group
-  name = "demo-testing"
+  name = "group-testing"
 
   min_size                  = 1
   max_size                  = 5
@@ -29,12 +96,13 @@ module "aws_autoscaling_group" {
   use_lt      = true
   create_lt   = true
 
-  image_id      = "ami-090717c950a5c34d3"
-  instance_type = "t3a.medium"
-  key_name      = "pratishtha-testing"
+  image_id      = var.img_id
+  instance_type = "t3.large"
+  key_name      = "instance-key"
+  iam_instance_profile_arn = aws_iam_instance_profile.drupal-grp_profile.arn
   #user_data_base64 = base64encode(local.user_data)
   user_data_base64 = base64encode(templatefile("${path.module}/userdata.sh", {
-    rds_endpt = var.rds_point, efs_dns_name = var.dns_name
+    rds_endpt = var.rds_point
   }))
 
   target_group_arns = var.target_gp
@@ -54,17 +122,17 @@ module "aws_autoscaling_group" {
     },
     {
       key                 = "BU"
-      value               = "demo-testing"
+      value               = "group-testing"
       propagate_at_launch = "true"
     },
     {
       key                 = "Owner"
-      value               = "pratishtha.verma@tothenew.com"
+      value               = "akshay.raj@tothenew.com"
       propagate_at_launch = "true"
     },
     {
       key                 = "Purpose"
-      value               = "gtihub project"
+      value               = "group project"
       propagate_at_launch = "true"
     }
   ]
